@@ -11,10 +11,10 @@ ans = .llvm(m$fib1, 10L, .ee = ee)
 print(ans)
 # Answer = 55
 
-db = dbConnect(SQLite(), "simpleData")
+db = dbConnect(SQLite(), "foo")
 sqliteExtension(db) # want the floor function from RSQLite extensions.
 
 ptr = getPointerToFunction(m$fib1, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
-d = dbGetQuery(db, "SELECT fib(x) FROM data LIMIT 5")
+d = dbGetQuery(db, "SELECT fib(x) FROM mytable LIMIT 5")
 }
