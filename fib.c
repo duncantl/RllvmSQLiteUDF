@@ -8,7 +8,10 @@ fib2(int n)
 }
 
 #include <sqlite3ext.h>
-SQLITE_EXTENSION_INIT1
+//#define SQLITE_CORE 1
+//extern sqlite3_api_routines *sqlite3_api;
+//static SQLITE_EXTENSION_INIT1
+static sqlite3_api_routines *sqlite3_api;
 
 #if 0
 #include <stdio.h>
@@ -26,25 +29,49 @@ sqlFib3(sqlite3_context *context, int argc, sqlite3_value **argv)
    sqlite3_result_int(context, ans);
 }
 
+#include "Rdefines.h"
+
 void
 sqlTen(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
+Rprintf("sqlite3_api %p %p\n", sqlite3_api, sqlite3_api->value_int);
      sqlite3_result_int(context, 10);
 }
 
 
 
 
-#include "Rdefines.h"
+
 SEXP
 R_setSQLite3API(SEXP ptr)
 {
-  sqlite3_api = (sqlite3_api_routines *) R_ExternalPtrAddr(ptr);
+  *sqlite3_api = *( (sqlite3_api_routines *) R_ExternalPtrAddr(ptr));
+Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
+//  Rprintf("sqlite3_api %p\n", sqlite3_api);
   return(R_NilValue);
 }
 
 SEXP
 R_getSQLite3API()
 {
+Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
   return(R_MakeExternalPtr(sqlite3_api, R_NilValue, R_NilValue));
 }
+
+
+
+int 
+sqlite3_fib_init(sqlite3 *db,          /* The database connection */
+                 char **pzErrMsg,      /* Write error messages here */
+                 const sqlite3_api_routines *pApi  /* API methods */
+                )
+{
+  Rprintf("in sqlite3_fib_init\n");
+    SQLITE_EXTENSION_INIT2(pApi);
+//    sqlite3_create_function(db, "registerFun", 2, SQLITE_UTF8, NULL, R_registerFunc, NULL, NULL);
+//    sqlite3_create_function(db, "ifloor", 1, SQLITE_UTF8, NULL, myfloorFunc, NULL, NULL);
+    return(SQLITE_OK);
+}
+
+
+
