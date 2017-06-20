@@ -5,21 +5,31 @@ library("RSQLite")
 library("RSQLiteUDF")
 library("Rllvm") 
 
+db = dbConnect(SQLite(), "foo")
+sqliteExtension(db) 
+
 
 m = parseIR("fib.ll")
-
 llvmAddSymbol(getNativeSymbolInfo("sqlite3_value_int"))
 llvmAddSymbol(getNativeSymbolInfo("sqlite3_result_int"))
 
 ee = ExecutionEngine(m)
+
+a = getNativeSymbolInfo("sqlite3_api")$address
+.llvm(m$R_setSQLite3API, a, .ee = ee)
+.llvm(m$R_getSQLite3API, .ee = ee)
+#m[["sqlite3_api"]] = a
+
 
 # Check code works
 ans = .llvm(m$fib2, 10L, .ee = ee)
 print(ans)
 # Answer = 55
 
-db = dbConnect(SQLite(), "foo")
-sqliteExtension(db) 
+
+ptr = getPointerToFunction(m$sqlTen, ee)
+createSQLFunction(db, ptr@ref, "ten", nargs = 0L)
+d = dbGetQuery(db, "SELECT ten()")
 
 ptr = getPointerToFunction(m$sqlFib3, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
