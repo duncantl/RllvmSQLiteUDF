@@ -7,7 +7,7 @@ The same code works within that, but not in a separate shared library.
 The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
 of the RSQLiteUDF package.
 
-This works on Linux.
+The C code works on Linux. The LLVM-compiled routine does not.
 
 ##Why?
 Why do we want to do this? Firstly, the available extension functions in SQLite 
