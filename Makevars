@@ -1,0 +1,2 @@
+PKG_CPPFLAGS=-I$(HOME)/local/include
+PKG_LIBS=-L$(HOME)/local/lib -lsqlite3
