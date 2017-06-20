@@ -12,7 +12,7 @@ print(ans)
 # Answer = 55
 
 db = dbConnect(SQLite(), "foo")
-sqliteExtension(db) # want the floor function from RSQLite extensions.
+sqliteExtension(db) 
 
 ptr = getPointerToFunction(m$fib1, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
