@@ -17,4 +17,9 @@ sqliteExtension(db)
 ptr = getPointerToFunction(m$fib1, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
 d = dbGetQuery(db, "SELECT fib(x) FROM mytable LIMIT 5")
+
+dyn.load("fib.so")
+p = getNativeSymbolInfo("fib2")
+createSQLFunction(db, p, "fib2", nargs = 1L)
+d = dbGetQuery(db, "SELECT fib2(x) FROM mytable LIMIT 5")
 }
