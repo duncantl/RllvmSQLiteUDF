@@ -2,10 +2,12 @@ This is an illustration of compiling an R function so that it can be used direct
 SQLite3 as a user-defined function.
 
 ##Note
-We are having issues getting this to work when compiled outside of the RSQLiteUDF package.
+On OSX, we are having issues getting this to work when compiled outside of the RSQLiteUDF package.
 The same code works within that, but not in a separate shared library.
 The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
 of the RSQLiteUDF package.
+
+This works on Linux.
 
 ##Why?
 Why do we want to do this? Firstly, the available extension functions in SQLite 
