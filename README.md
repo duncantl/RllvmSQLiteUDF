@@ -64,6 +64,7 @@ First we compile the code into machine code:
 ```r
 library(Rllvm)
 m = parseIR("fib.ll")
+llvmAddSymbol("sqlite3_value_int", "sqlite3_result_int")
 ee = ExecutionEngine(m)
 ```
 
