@@ -61,7 +61,7 @@ We create a compiled version of this directly from a previously generated ll fil
 See run.R for the actual R code.
 ```r
 library(Rllvm)
-m = parseIR("fib_basic.ll")
+m = parseIR("fib.ll")
 ee = ExecutionEngine(m)
 ```
 
@@ -73,9 +73,13 @@ sqliteExtension(db)
 ```
 
 ```
-ptr = getPointerToFunction(m$sqlFib, ee)
+ptr = getPointerToFunction(m$sqlFib3, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
-d = dbGetQuery(db, "SELECT fib(x) FROM mytable LIMIT 5")
+```
+
+We can now test the UDF with 
+```
+d = dbGetQuery(db, "SELECT fib(x) FROM mytable")
 ```
 
 ##Data
