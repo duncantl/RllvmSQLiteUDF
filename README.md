@@ -2,12 +2,23 @@ This is an illustration of compiling an R function so that it can be used direct
 SQLite3 as a user-defined function.
 
 ##Note
-On OSX, we are having issues getting this to work when compiled outside of the RSQLiteUDF package.
-The same code works within that, but not in a separate shared library.
 The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
 of the RSQLiteUDF package.
 
-The C code works on Linux. The LLVM-compiled routine does not.
+The LLVM-compiled routines do not work yet.
+
+The reason "appears" to be that the variable sqlite3_api is local to the LLVM module
+and is probably not getting initialized. 
+This is a struct of type sqlite3_api_routines and has all the routines we need to implement the
+SQLite3 API.
+
+
+Since we don't load a DLL via sqliteExtension() to get the LLVM routines, we don't have an
+opportunity to call the sqlite3_X_init() routine in the DLL.
+
+So we have to find a way to initialize it.
+
+
 
 ##Why?
 Why do we want to do this? Firstly, the available extension functions in SQLite 
@@ -42,7 +53,7 @@ The signature needs to be
 void sqlFib(sqlite3_context *context, int argc, sqlite3_value **argv)
 ```
 The wrapper routine sqlFib is implemented as
-```
+```c
 void
 sqlFib(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
