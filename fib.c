@@ -26,5 +26,25 @@ sqlFib3(sqlite3_context *context, int argc, sqlite3_value **argv)
    sqlite3_result_int(context, ans);
 }
 
+void
+sqlTen(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+     sqlite3_result_int(context, 10);
+}
 
 
+
+
+#include "Rdefines.h"
+SEXP
+R_setSQLite3API(SEXP ptr)
+{
+  sqlite3_api = (sqlite3_api_routines *) R_ExternalPtrAddr(ptr);
+  return(R_NilValue);
+}
+
+SEXP
+R_getSQLite3API()
+{
+  return(R_MakeExternalPtr(sqlite3_api, R_NilValue, R_NilValue));
+}
