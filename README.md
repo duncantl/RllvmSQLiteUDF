@@ -59,26 +59,29 @@ We create a compiled version of this directly from a previously generated ll fil
 
 ##Using the Code in R
 See run.R for the actual R code.
+
+First we compile the code into machine code:
 ```r
 library(Rllvm)
 m = parseIR("fib.ll")
 ee = ExecutionEngine(m)
 ```
 
-```
+Now we connect to the database:
+```r
 library(RSQLite)
 library(RSQLiteUDF)
 db = dbConnect(SQLite(), "foo")
 sqliteExtension(db) 
 ```
 
-```
+```r
 ptr = getPointerToFunction(m$sqlFib3, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
 ```
 
 We can now test the UDF with 
-```
+```r
 d = dbGetQuery(db, "SELECT fib(x) FROM mytable")
 ```
 
