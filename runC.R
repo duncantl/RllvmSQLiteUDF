@@ -6,7 +6,8 @@ sqliteExtension(db)
 dyn.load("fib.so")
 p = getNativeSymbolInfo("sqlFib3")
 createSQLFunction(db, "sqlFib3", "fib3", nargs = 1L)
-d = dbGetQuery(db, "SELECT x, fib3(x) FROM mytable LIMIT 2")
+d = dbGetQuery(db, "SELECT x, fib3(x) FROM mytable")
+
 
 
 
