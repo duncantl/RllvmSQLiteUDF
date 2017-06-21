@@ -36,10 +36,12 @@ createSQLFunction(db, ptr@ref, "ten", nargs = 0L)
 
 d = dbGetQuery(db, "SELECT ten()")
 stopifnot(d[1,1] == 10)
+print(d)
 
 ptr = getPointerToFunction(m$sqlFib3, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
 d = dbGetQuery(db, "SELECT fib(x) FROM mytable")
+print(d)
 
 
 

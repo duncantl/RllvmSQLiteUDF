@@ -1,5 +1,18 @@
+# Compiling an R Function as a User-Defined Function in SQLite3
+
 This is an illustration of compiling an R function so that it can be used directly within
 SQLite3 as a user-defined function.
+
+A similar and simpler example is a user-defined function for XPath and illustrated in
+[RllvmXPathUDF](https://github.com/duncantl/RllvmXPathUDF).
+
+##Example
+```
+make fib.ll
+Rscript run1.R
+```
+source("run1.R", echo = TRUE)
+
 
 ##Why?
 Why do we want to do this? Firstly, the available extension functions in SQLite 
@@ -43,14 +56,15 @@ sqlFib(sqlite3_context *context, int argc, sqlite3_value **argv)
    sqlite3_result_int(context, ans);
 }
 ```
-We have assumed we are called with one argument and that it is an integer.
+We have assumed our UDF will be called with one argument and that it is compatible with an integer.
 We could check the number and type(s) of the argument(s).
 
 We need to generate the code for both sqlFib() and fib2().
-We create a compiled version of this directly from a previously generated ll file.
+We would do this directly from Rllvm (or RLLVMCompile). However, for this example,
+we create a compiled version of this directly from a previously generated ll file.
 
 ##Using the Code in R
-See run.R for the actual R code.
+See run1.R for the actual R code.
 
 First we compile the code into machine code:
 ```r
@@ -65,7 +79,7 @@ Now we connect to the database:
 library(RSQLite)
 library(RSQLiteUDF)
 db = dbConnect(SQLite(), "foo")
-sqliteExtension(db) 
+sqliteExtension(db, pkg = "RSQLiteUDF") 
 ```
 
 ```r
@@ -78,6 +92,9 @@ We can now test the UDF with
 d = dbGetQuery(db, "SELECT fib(x) FROM mytable")
 ```
 
+There is an extra step that is needed for SQLite3. This is discussed in the <a href="#Note2">Note below</a>.
+
+
 ##Data
 The data are created via the shell command
 ```
@@ -86,19 +103,44 @@ sqlite3 foo < data.sql
 
 
 
-##Note
+##Note1
 The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
 of the RSQLiteUDF package.
 
-The reason "appears" to be that the variable sqlite3_api is local to the LLVM module
-and is probably not getting initialized. 
+<h2><a name="Note2">Note2</a></h2>
+Each SQLite3 extension contains a global variable named sqlite3_api within that extension.
 This is a struct of type sqlite3_api_routines and has all the routines we need to implement the
-SQLite3 API.
+SQLite3 API and are used in higher-level calls such as sqlite3_value_int and
+sqlite3_result_int that we use in our wrapper routine above.
 
-This variable is typically initialized in an extension when 
+This sqlite3_api variable is initialized to `NULL`.  However, the idiom is that we set it in our
+extension initialization routine that SQLite3 invokes when we register the extension by specifying
+the DLL containing the extension code.  SQLite3 loads that DLL and then calls its SQLite3-specific
+initialization routine (e.g. sqlite3_extension_init), passing an object we can use to set
+sqlite3_api.  Once that is set, we can register and use the UDF routines in SQL commands.
 
-Since we don't load a DLL via sqliteExtension() to get the LLVM routines, we don't have an
-opportunity to call the sqlite3_X_init() routine in the DLL.
+Our situation is more complicated. We don't have a DLL that we ask SQLite3 to load.
+Our routines are in memory since we generated the code directly via LLVM.
+As a result, there is no direct mechanism by which we can access the object that SQLite3
+would pass to our initialization routine so that we can set sqlite3_api approriately.
 
-So we have to find a way to initialize it.
+We use the following approach.  We load the RSQLiteUDF DLL. SQLite3 then calls
+its sqlite3_extension_init() routine and we initialize the sqlite3_api variable
+in that DLL.  This is different from the one in our LLVM generated Module.
+However, we get the value of the RSQLiteUDF::sqlite3_api variable and we set
+sqlite3_api  in our LLVM module to that same value. 
+
+To do this, we have a routine in RSQLiteUDF to obtain the value of its sqlite3_api value.
+We also added a routine in our LLVM module to take an R external pointer object and use
+its value to set the sqlite3_api variable in the LLVM module.
+These two steps are done in the following important lines in run1.R:
+```r
+b = .Call("R_getSQLite3API", PACKAGE = "RSQLiteUDF")
+.llvm(m$R_setSQLite3API, b, .ee = ee, .ffi = Rffi::CIF(Rffi::sexpType, list(Rffi::sexpType)))
+```
+This is done before we invoke any UDFs, and it is probably most prudent to do it before
+registering any UDFs.
+
+
+
 
