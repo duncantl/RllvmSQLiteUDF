@@ -13,7 +13,7 @@ fib2(int n)
 //#define SQLITE_CORE 1
 //extern sqlite3_api_routines *sqlite3_api;
 //static SQLITE_EXTENSION_INIT1
-static sqlite3_api_routines *sqlite3_api;
+static const sqlite3_api_routines *sqlite3_api;
 
 #if 0
 #include <stdio.h>
@@ -63,7 +63,7 @@ SEXP
 R_getSQLite3API()
 {
 //Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
-  return(R_MakeExternalPtr(sqlite3_api, R_NilValue, R_NilValue));
+    return(R_MakeExternalPtr((void *) sqlite3_api, R_NilValue, R_NilValue));
 }
 
 
