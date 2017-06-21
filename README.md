@@ -6,12 +6,14 @@ SQLite3 as a user-defined function.
 A similar and simpler example is a user-defined function for XPath and illustrated in
 [RllvmXPathUDF](https://github.com/duncantl/RllvmXPathUDF).
 
-##Example
+##How to run the example
 ```
 make fib.ll
 Rscript run1.R
 ```
-source("run1.R", echo = TRUE)
+You may not need to create fib.ll, but if you get an error in the call to parseIR(),
+you will.  This happens when you use a version of LLVM that is different from
+the version of clang used to create the fib.ll file and the format of the IR is slightly different.
 
 
 ##Why?
