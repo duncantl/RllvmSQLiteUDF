@@ -15,9 +15,11 @@ llvmAddSymbol(getNativeSymbolInfo("sqlite3_result_int"))
 
 ee = ExecutionEngine(m)
 
-a = getNativeSymbolInfo("sqlite3_api")$address
+if(FALSE) {
+a = getNativeSymbolInfo("sqlite3_api", "RSQLite")$address
 .llvm(m$R_setSQLite3API, a, .ee = ee)
 .llvm(m$R_getSQLite3API, .ee = ee)
+}
 #m[["sqlite3_api"]] = a
 
 
@@ -28,7 +30,17 @@ print(ans)
 
 
 ptr = getPointerToFunction(m$sqlTen, ee)
+# registering the function triggers the call to the sqlite3_X_init routine which we want
+# so that the sqlite3_api variable in that DLL is set.
 createSQLFunction(db, ptr@ref, "ten", nargs = 0L)
+
+b = getNativeSymbolInfo("sqlite3_api", "RSQLiteUDF")$address
+library(Rffi)
+dyn.load("fib.so")
+r = getNativeSymbolInfo("R_setSQLite3API")
+callCIF(Rffi::CIF(Rffi::sexpType, list(Rffi::sexpType)), r, b)
+
+.llvm(m$R_setSQLite3API, b, .ee = ee, .ffi = Rffi::CIF(Rffi::sexpType, list(Rffi::sexpType)))
 d = dbGetQuery(db, "SELECT ten()")
 
 ptr = getPointerToFunction(m$sqlFib3, ee)

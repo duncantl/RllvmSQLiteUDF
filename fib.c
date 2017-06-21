@@ -45,16 +45,22 @@ Rprintf("sqlite3_api %p %p\n", sqlite3_api, sqlite3_api->value_int);
 SEXP
 R_setSQLite3API(SEXP ptr)
 {
-  *sqlite3_api = *( (sqlite3_api_routines *) R_ExternalPtrAddr(ptr));
-Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
+//  sqlite3_api = ( (sqlite3_api_routines *) R_ExternalPtrAddr(ptr));
+//Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
 //  Rprintf("sqlite3_api %p\n", sqlite3_api);
+  return(R_NilValue);
+}
+
+SEXP
+R_2setSQLite3API(SEXP ptr)
+{
   return(R_NilValue);
 }
 
 SEXP
 R_getSQLite3API()
 {
-Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
+//Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
   return(R_MakeExternalPtr(sqlite3_api, R_NilValue, R_NilValue));
 }
 
