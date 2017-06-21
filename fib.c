@@ -1,3 +1,5 @@
+void showAPI();
+
 int
 fib2(int n)
 {
@@ -45,7 +47,7 @@ Rprintf("sqlite3_api %p %p\n", sqlite3_api, sqlite3_api->value_int);
 SEXP
 R_setSQLite3API(SEXP ptr)
 {
-//  sqlite3_api = ( (sqlite3_api_routines *) R_ExternalPtrAddr(ptr));
+  sqlite3_api = ( (sqlite3_api_routines *) R_ExternalPtrAddr(ptr));
 //Rprintf("sqlite3_api %p %d\n", sqlite3_api, (sqlite3_api->value_int != NULL));
 //  Rprintf("sqlite3_api %p\n", sqlite3_api);
   return(R_NilValue);
@@ -74,6 +76,7 @@ sqlite3_fib_init(sqlite3 *db,          /* The database connection */
 {
   Rprintf("in sqlite3_fib_init\n");
     SQLITE_EXTENSION_INIT2(pApi);
+    showAPI()    ;
 //    sqlite3_create_function(db, "registerFun", 2, SQLITE_UTF8, NULL, R_registerFunc, NULL, NULL);
 //    sqlite3_create_function(db, "ifloor", 1, SQLITE_UTF8, NULL, myfloorFunc, NULL, NULL);
     return(SQLITE_OK);
@@ -81,3 +84,17 @@ sqlite3_fib_init(sqlite3 *db,          /* The database connection */
 
 
 
+
+
+void
+showAPI()
+{
+
+  Rprintf(" sqlite3_api = %p\n", sqlite3_api);
+  if(sqlite3_api) {
+     if(sqlite3_api->value_int)
+        Rprintf(" sqlite3_api->value_int = %p\n", sqlite3_api->value_int);
+     else
+        Rprintf("  sqlite3_api->value_int = NULL\n");
+  }
+}
