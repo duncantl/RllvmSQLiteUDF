@@ -1,25 +1,6 @@
 This is an illustration of compiling an R function so that it can be used directly within
 SQLite3 as a user-defined function.
 
-##Note
-The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
-of the RSQLiteUDF package.
-
-The LLVM-compiled routines do not work yet.
-
-The reason "appears" to be that the variable sqlite3_api is local to the LLVM module
-and is probably not getting initialized. 
-This is a struct of type sqlite3_api_routines and has all the routines we need to implement the
-SQLite3 API.
-
-
-Since we don't load a DLL via sqliteExtension() to get the LLVM routines, we don't have an
-opportunity to call the sqlite3_X_init() routine in the DLL.
-
-So we have to find a way to initialize it.
-
-
-
 ##Why?
 Why do we want to do this? Firstly, the available extension functions in SQLite 
 are not comprehensive and it is convenient to add new ones.
@@ -102,4 +83,22 @@ The data are created via the shell command
 ```
 sqlite3 foo < data.sql
 ```
+
+
+
+##Note
+The fib.c C code and runC.R R code are here to simplify testing why the UDFs do not work outside
+of the RSQLiteUDF package.
+
+The reason "appears" to be that the variable sqlite3_api is local to the LLVM module
+and is probably not getting initialized. 
+This is a struct of type sqlite3_api_routines and has all the routines we need to implement the
+SQLite3 API.
+
+This variable is typically initialized in an extension when 
+
+Since we don't load a DLL via sqliteExtension() to get the LLVM routines, we don't have an
+opportunity to call the sqlite3_X_init() routine in the DLL.
+
+So we have to find a way to initialize it.
 
