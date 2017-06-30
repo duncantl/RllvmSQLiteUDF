@@ -97,6 +97,28 @@ d = dbGetQuery(db, "SELECT fib(x) FROM mytable")
 There is an extra step that is needed for SQLite3. This is discussed in the <a href="#Note2">Note below</a>.
 
 
+
+
+## dexp() example
+
+```
+ptr = getPointerToFunction(m$sqlDexp, ee)
+createSQLFunction(db, ptr@ref, "dexp", nargs = 2L)
+d1 = dbGetQuery(db, "SELECT dexp(y/x, 1.2) FROM mytable")
+```r
+
+To compute the log-likelihood, we need to register an extension function for log:
+```r
+createSQLFunction(db, getNativeSymbolInfo("sqlLog", "RSQLiteUDF"), "log", nargs = 1L)
+```
+
+And now we can use sum(), log() and dexp() in our SQL query:
+```r
+d2 = dbGetQuery(db, "SELECT sum(log(dexp(y/x, 1.2))) FROM mytable")
+```
+
+
+
 ##Data
 The data are created via the shell command
 ```
