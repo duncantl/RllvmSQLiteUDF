@@ -1,6 +1,6 @@
 #CLANG=~/LLVM3.9/clang+llvm-3.9.0-x86_64-apple-darwin/bin/clang
-#CLANG=~/LLVM3.7/clang+llvm-3.7.0-x86_64-apple-darwin/bin/clang
-CLANG=clang
+CLANG=~/LLVM3.7/clang+llvm-3.7.0-x86_64-apple-darwin/bin/clang
+#CLANG=clang
 #R_HOME=$(shell R RHOME)
 R_INC=${R_HOME}/include
 #R_INC=/usr/share/R/include
