@@ -8,10 +8,10 @@ A similar and simpler example is a user-defined function for XPath and illustrat
 
 ##How to run the example
 ```
-make fib.ll
-Rscript run1.R
+make minSQLFib.ll
+Rscript run2.R
 ```
-You may not need to create fib.ll, but if you get an error in the call to parseIR(),
+You may not need to create minSQLFib.ll, but if you get an error in the call to parseIR(),
 you will.  This happens when you use a version of LLVM that is different from
 the version of clang used to create the fib.ll file and the format of the IR is slightly different.
 
@@ -22,18 +22,18 @@ are not comprehensive and it is convenient to add new ones.
 More importantly, we can avoid moving large amounts of data from the database to R.
 Consider 
 ```
-sum(dexp(x, 4))
+sum(log(dexp(x, 4)))
 ```
 where x is a column in a database.
 We would compute this likehood value with
 ``` 
-sum(dexp(dbGetQuery(db, "SELECT x from table"), 4))
+sum(log(dexp(dbGetQuery(db, "SELECT x from table"), 4)))
 ```
 However, if dexp() was defined as a UDF in the database, we could write
 ```
-dbGetQuery(db, "SELECT sum(dexp(x, 4)) from table")
+dbGetQuery(db, "SELECT sum(log(dexp(x, 4))) from table")
 ```
-In this case, the database can fuse the loop for computing each `dexp(x[i])` and the sum.
+In this case, the database can fuse the loop for computing each `dexp(x[i])`, the `log()` and the sum().
 We do not compute the entire vector of x values in the database, allocate a parallel vector
 in R, copy the values and then compute a second vector `dexp(x)` and then loop over that 
 to compute the sum().
