@@ -1,13 +1,6 @@
 void showAPI();
 
-int
-fib2(int n)
-{
-    if(n < 2)
-	return(n);
-    
-    return(fib2(n-1) + fib2(n-2));
-}
+#include "fibRoutine.c"
 
 #include <sqlite3ext.h>
 //#define SQLITE_CORE 1
