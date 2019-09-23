@@ -1,0 +1,66 @@
+library(Rllvm)
+m = parseIR("fib_basic.ll")
+
+# Get the struct definition for sqlite3_api_routines from a previously generated IR file.
+m2 = parseIR("minSQLFib.ll")
+ty = getElementType(getElementType(getType(m2[["sqlite3_api"]])))
+
+fields = .Call("R_StructType_elements", ty)
+ff = getElementType(fields[[107]])  # int_value() field.
+params = .Call("R_FunctionType_params", ff)
+rt = .Call("R_FunctionType_getReturnType", ff)
+
+ctxtTy = .Call("R_FunctionType_params", getElementType(fields[[1]]))[[1]]
+
+# Create opaque data struct for sqlite3_value as we never look in its fields.
+# However, this is not necessarily the identical type as the one in the sqlite3_api_routines
+# function pointers. So we get that type used in that module rather than defining our own.
+#sql_val = structType(list(), "sqlite3_value", getContext(m), withNames = FALSE)
+sql_val = params[[1]]
+
+
+#  structType(list(), "sqlite3_value", getContext(m), withNames = FALSE)
+
+f = Function("sqlfib", VoidType, list(ctxt = ctxtTy, argc = Int32Type, argv = pointerType(sql_val)), m)
+
+
+api = createGlobalVariable("sqlite3_api_routines", m, pointerType(ty))
+#api = m[["sqlite3_api_routines"]]
+
+b = Block(f)
+ir = IRBuilder(b)
+nparams = getParameters(f)
+
+api2 = ir$createLoad(api)
+# The 106 comes from the IR or from looking at the struct definition for sqlite3_api_routines
+# and we see that value_int() is in position 107 starting counting at 1.
+value_int_p = ir$createGEP(api2, c(0L, 106L))
+value_int = ir$createLoad(value_int_p)
+#argv1 = ir$createGEP(nparams[[3]], c(0L))
+argv1 = ir$createLoad(nparams[[3]])
+
+arg = ir$createCall(value_int, argv1) #XXXX assertion about matching parameter types is failing and terminating.
+                                       # problem was argv = pointerType(pointerType()). Only one pointerType. Why???
+                                       # Because  the sql_val we extracted from the pregenerated IR gave a
+				       # pointer type to the struct that is sqlite3_value.
+ans = ir$createCall(m$fib1, arg)
+
+result_int = ir$createGEP(api2, c(0L, 82L))
+result_int = ir$createLoad(result_int)
+if(FALSE) {
+
+a = getElementType(getType(result_int))
+pp = .Call("R_FunctionType_params", a)
+getElementType(pp[[1]])
+
+sameType(pp[[2]], getType(ans))
+
+sameType(getType(nparams[[1]]), pp[[1]])
+a = getType(nparams[[1]])
+b = pp[[1]]
+
+
+ir$createCall(result_int, nparams[[1]], ans)
+
+ir$createReturn()
+}
