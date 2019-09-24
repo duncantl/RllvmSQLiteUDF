@@ -99,7 +99,7 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
 
        # Create the errBlock code.
      ir$setInsertPoint(errBlock)
-     createUDFError(ir, nparams, length(params), module, returnBlock, getName(fun), api)
+     createUDFError(ir, nparams, length(params), module, returnBlock, c(getName(f), getName(fun)), api)
 
        # Create the simple returnBlock code which is just return with a void.
      ir$setInsertPoint(returnBlock)
@@ -113,11 +113,11 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
 
 
 createUDFError =
-function(ir, udfparams, numExpected, module, returnBlock, origFunName, api)
+function(ir, udfparams, numExpected, module, returnBlock, funNames, api)
 {
-    fmt = sprintf("Expected %d arguments for %s, got XXX", numExpected, origFunName)
-    fmt = sprintf("Expected %d arguments for %s, got %%d", numExpected, origFunName)
-    rmsg = sprintf("incorrect number of arguments to %s", origFunName)    
+#    fmt = sprintf("Expected %d arguments for %s, got XXX", numExpected, origFunName)
+#    fmt = sprintf("Expected %d arguments for %s, got %%d", numExpected, origFunName)
+    rmsg = sprintf("incorrect number of arguments to %s (proxy for %s), expecting %d arguments", funNames[1], funNames[2], numExpected)
     # have the compiled code insert udfparams[[2]] at the end of the string at position i.
     # and put a \0 after this
     #     i = gregexpr("XXX", fmt)[[1]]
