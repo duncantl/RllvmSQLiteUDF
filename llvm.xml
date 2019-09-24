@@ -362,6 +362,11 @@ ee = ExecutionEngine(m)
 cif = Rffi::CIF(Rffi::voidType, list(Rffi::pointerType))  
 .llvm(m$R_setSQLite3API, ptr, .ee = ee, .ffi = cif)  
 </r:code>
+<note>
+  We could have defined R_setSQLite3API to take a SEXP
+  and return a SEXP and then use .Call() to avoid the use of Rffi and CIFs.
+  This is perhaps simpler.
+</note>
 </para>
 <para>
   We have now established the module so that we can use it within an SQL request.
@@ -530,9 +535,21 @@ saveRDS(names(rtns@fields), "sqlite3_api_routineFieldNames.rds")
   and then use that in our module.
   In principle, we could discover how to initialize our own instance of this structure in our own
   module rather than relying on some external DSO's initialization.
-  This is slightly easier said than done. However, since we can both generate and analyze code,
-  we can discover when and how the initialization is done.
-  Whether this is a good, solid, portable approach is another matter.
+  This would make our module stand-alone.
+  This is slightly easier said than done.
+  When SQLite3 is told to load an extension DSO, it invokes an entry point in the DSO,
+  passing it an initialized instance of the structure. The entry point copies the strut
+  to its local variable.
+  Note however that we never request SQLite3 to load our module or DSO.
+  We use the address of the routine(s) within the module to register extensions.
+  So we by-pass the DSO loading and hence the initialization step.
+</para>
+<para>
+  To get the information we want, we need the (address of the) variable <c:var>sqlite3Apis</c:var>
+  in the SQLite3 code.
+  This is a static variable in sqlite3.c. It is passed (by address) in the call to the initialization
+  routine of an extension. However, it is not accessible from the sqlite3 DSO itself
+  via getNativeSymbolInfo().
 </para>
 </section>
 
