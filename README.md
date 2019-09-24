@@ -1,3 +1,12 @@
+#  NOTE - Version of RSQLite
+
+**NOTE**  For now, we use RSQLite version 1.0.0.
+In the future, we will make this work with subsequent versions of RSQLite.
+The reason is that accessing the C-level pointer to the database was changed
+in versions >  1.0.0 due to the use of Rcpp and I haven't had the time to chase this down.
+This is a minor technical matter. The focus here is on the proof of concept
+and the logistics to make it work.
+
 # Compiling an R Function as a User-Defined Function in SQLite3
 
 This is an illustration of compiling an R function so that it can be used directly within
