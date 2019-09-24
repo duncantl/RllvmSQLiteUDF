@@ -1,7 +1,9 @@
 <article
 	 xmlns:c="http://www.C.org"
 	 xmlns:xi="http://www.w3.org/2003/XInclude"
-	 xmlns:r="http://www.r-project.org">
+	 xmlns:r="http://www.r-project.org"
+	 xmlns:sh="http://www.shell.org"
+	 xmlns:omg="http://www.omegahat.org">
 
 <section>
 <title>Generating an SQLite UDF Wrapper Routine</title>
@@ -373,5 +375,6 @@ Now we can use it in a query.
 d = dbGetQuery(db, "SELECT x, fib(x) FROM mytable")
 d2 = dbGetQuery(db, "SELECT x FROM mytable WHERE fib(x) >= 8")
 </r:code>
+</para>
 </section>  
 </article>
