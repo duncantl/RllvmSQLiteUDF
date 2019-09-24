@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <article
 	 xmlns:c="http://www.C.org"
 	 xmlns:xi="http://www.w3.org/2003/XInclude"
@@ -76,7 +77,7 @@ the type definitions may be optimized out of the resulting IR file.
   We  can now read the module containing the ttype definitions from the SQLite3 extension header
   file that we want.
 <r:code>
-m2 = parseIR("simpleSQL.ll")  # minSQLFib.ll
+m2 = parseIR("simpleSQL.ll")  
 </r:code>
 
 We want the type definition of the sqlite3_api global variable.
@@ -377,4 +378,162 @@ d2 = dbGetQuery(db, "SELECT x FROM mytable WHERE fib(x) >= 8")
 </r:code>
 </para>
 </section>  
+
+<section>
+<title>Getting the Names of the sqlite3_api_routines Fields</title>
+
+<para>
+We noted above that we knew positions 107 and 83 were the fields corresponding
+to value_int() and result_int().
+We can look through the header file manually and count these. This is clearly
+neither good, reproducible, or general.
+Instead, we want to do this programmatically.
+We can use <omg:pkg>RCIndex</omg:pkg> to analyze the C code in the header files.
+As we mentioned, we want access to the macros, so we will parse the code
+keeping the macro definitions.
+We do this with 
+<!-- See SQLUDF.xml in the draft of the Compiler book.  -->
+<r:code>
+library(RCIndex)
+tu = createTU("/usr/local/include/sqlite3ext.h", 
+              includes = "/usr/local/include", 
+              options = CXTranslationUnit_DetailedPreprocessingRecord)
+</r:code>
+We now have a translation unit for the sqlite3ext.h header file.
+We knew this was the file of interest, as opposed to sqlite3.h.
+</para>
+<para>
+  We know we want the sqlite3_api_routines data structure.
+  So let's get that directly
+<r:code>
+ds = getDataStructures(tu)
+names(ds)  
+rtns = ds$sqlite3_api_routines  
+</r:code>
+We can see the names of the fields in this structure with
+<r:code>
+names(rtns@fields)
+</r:code>
+Hence we can find the indices of value_int and result_int
+<r:code>
+match(c("value_int", "result_int"), names(rtns@fields))
+<r:output><![CDATA[
+[1] 107  83
+]]></r:output>
+</r:code>
+These are the values we found earlier.
+As we move to 0-based counting, we use 106 and 82 in the <r:func>createGEP</r:func> calls.
+</para>
+
+
+<para>
+  Of course, it is possible that the compiled data structure and the one we parse without
+  compilation flags could be different. In such cases, we would have a complicated job
+  to match records across the two sets of fields - the LLVM and RCIndex.
+  However, in this case, we note that we saw there were 243 fields in the LLVM
+  type for sqlite3_api_routines, and exactly the same in the RCIndex data structure.
+  So we have reason to believe these are in 1-1 order, and they are.
+</para>
+
+
+
+<para>
+  Based on knowing the relevant of the sqlite3_api_routines structure and looking
+  at the function pointers in this structure, we were able to get the
+  different types we needed. We knew we needed the sqlite3_context and sqlite_value,
+  so we  identified routines that had these.    We could have found these programmatically,
+  given that we knew the names of the two data types for which we were looking.
+</para>
+
+
+
+<para>
+  Let's look at the first field:
+<r:code>
+f = rtns@fields[[1]]
+</r:code>
+Checking its type kind, we see it is a pointer
+<r:code>
+f$kind
+</r:code>
+We get the type to which it is a pointer
+<r:code>
+  t2 = getPointeeType(f)
+  t2$kind
+</r:code>
+This is FunctionProto - a function prototype.
+We can resolve this to the canonical type with
+<r:code>
+t3 = getCanonicalType(t2)
+</r:code>
+which is also a FunctionProto.
+</para>
+
+<para>
+  How do we drill down into the details
+<r:code>
+getName(t3)
+</r:code>
+
+We get the return type of a FunctionProto with 
+<r:code>
+  rt = getResultType(t3)
+</r:code>
+We can get its name, compare it to a VoidType or a pointer to a void type:
+<r:code>
+getName(rt)
+isVoidType(rt)
+isVoidType(getPointeeType(rt))
+</r:code>
+
+We can query the number of arguments with
+<r:code>
+getNumArgTypes(t3)
+</r:code>
+
+We can get their types with
+<r:code>
+p = lapply(seq_len(getNumArgTypes(t3)), function(i) getArgType(t3, i))
+sapply(p, getName)
+</r:code>
+</para>
+
+
+<para>
+  In principle, we could read the header file and programmatically
+  construct the sqlite3_api_routines data structure for LLVM by
+  translating it from RCIndex types to LLVM types.
+  This would allow us to avoid relying on the template simpleSQL.ll file.
+  However, this does not seem like a better approach.
+  <!-- explain why FIX -->
+</para>
+
+
+<para>
+  For now, we write out the names of the fields so that we can use these
+  in generating LLVM code to identify the position of a named field in the
+  sqlite3_api_routines data structure.
+<r:code>
+saveRDS(names(rtns@fields), "sqlite3_api_routineFieldNames.rds")
+</r:code>
+</para>
+
+</section>
+
+<section>
+<title>The sqlite3_api object</title>
+
+<para>
+  We used a pointer to an sqlite3_api_routines object as a local object in our module.
+  However, we initialized it using a value from the RSQLiteUDF package.
+  We needed that initialized version to contain the function pointer addresses in the structure
+  and then use that in our module.
+  In principle, we could discover how to initialize our own instance of this structure in our own
+  module rather than relying on some external DSO's initialization.
+  This is slightly easier said than done. However, since we can both generate and analyze code,
+  we can discover when and how the initialization is done.
+  Whether this is a good, solid, portable approach is another matter.
+</para>
+</section>
+
 </article>
