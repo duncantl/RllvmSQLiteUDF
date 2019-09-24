@@ -5,14 +5,11 @@ library("Rllvm")
 db = dbConnect(SQLite(), "foo")
 
 m = parseIR("minSQLFib.ll")
-llvmAddSymbol(getNativeSymbolInfo("sqlite3_value_int"))
-llvmAddSymbol(getNativeSymbolInfo("sqlite3_result_int"))
-# for dexp()
-llvmAddSymbol(getNativeSymbolInfo("sqlite3_value_double"))
-llvmAddSymbol(getNativeSymbolInfo("sqlite3_result_double"))
+llvmAddSymbol("sqlite3_value_int", "sqlite3_result_int", "sqlite3_value_double", "sqlite3_result_double")
 
 ee = ExecutionEngine(m)
 
+# Check the regular fib() routine works as expected.
 ans = .llvm(m$fib2, 10L, .ee = ee)
 stopifnot(ans == 55)
 
@@ -23,7 +20,6 @@ b = .Call("R_getSQLite3API", PACKAGE = "RSQLiteUDF")
 
 cif = Rffi::CIF(Rffi::voidType, list(Rffi::pointerType))
 .llvm(m$R_setSQLite3API, b, .ee = ee, .ffi = cif)
-
 
 ptr = getPointerToFunction(m$sqlFib3, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
