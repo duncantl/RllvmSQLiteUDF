@@ -1,54 +1,266 @@
+<article
+	 xmlns:c="http://www.C.org"
+	 xmlns:xi="http://www.w3.org/2003/XInclude"
+	 xmlns:r="http://www.r-project.org">
+
+<section>
+<title>Generating an SQLite UDF Wrapper Routine</title>
+
+<para>
+The approach we will take here is to manually generate the wrapper routine
+to see what is involved.  We document the steps decisions, shortcuts and shortcomings.
+As with the XPath UDFs and generally for creating wrappers, we will start with
+an existing module that contains the routine(s) to be wrapped.
+For this example, we write the Fibonnaci function implementation as fib()
+routine in C and generate the corresponding LLVM IR from that.
+We could generate this directly in R, but we do so directly from C code for convenience
+so we can focus on the primary issue being discussed.
+</para>
+<para>
+So we load the module with the fib() routine defined
+<r:code>
 library(Rllvm)
 m = parseIR("fib_basic.ll")
+</r:code>
+</para>
 
-# Get the struct definition for sqlite3_api_routines from a previously generated IR file.
-m2 = parseIR("minSQLFib.ll")
+<para>
+As we discuss in the draft of the Compiler Technologies in R Book (SQLUDF.xml),
+an SQLite3 UDF wrapper routine uses the pointer to the
+sqlite3_api_routines structure to access all of the routines it needs to call.
+In other words, instead of calling top-level routines,
+the routines are stored in fields in a struct which are "function pointers".
+These routines for the fibonacci wrapper are int_value() and result_int.
+These correspond to calls of the form sqlite3_value_int() and
+sqlite3_result_int() in C code, but these are macros that transform to
+sqlite_api->value_int() and sqlite3_api->result_int, respectively.
+
+</para>
+<para>
+We will need access to an sqlite3_api_routines object
+and also to the definition of this object.
+We need to find the definitions for the function pointers for these
+two fields - value_int and result_int.
+More generally, we will need access to other routines such as value_double(), result_double()
+and marshalling routines for many other types.
+</para>
+<para>
+There are at least two ways for us to go about getting the definition of the sqlite3_api_routines.
+One is to interrogate the header files using, e.g., the <omg:pkg>RCIndex</omg:pkg> package.
+Another is to extract the type information from another IR module.
+We'll use a hybrid of both, relying heavily on the latter and only matching elements by name with the former.
+</para>
+<para>
+The idea to use LLVM IR to get the definition of the sqlite3_api_routines is quite simple.
+We write a simple C file that uses one or more of the sqlite3_api_routines fields.
+Then we convert that C file to an LLVM IR module.
+We then read that into R and use the type from that module in the new module we are creating.
+The types are global across the LLVM instance and shared by modules.
+</para>
+<para>
+Our simple C file is
+<c:code>
+<xi:include href="simpleSQL.c" parse="text"/>    
+</c:code>
+
+We create the ll file with
+<sh:code>
+make simpleSQL.ll
+</sh:code>
+Note that it is important we compile this with no optimization (i.e. -O0) as otherwise
+the type definitions may be optimized out of the resulting IR file.
+</para>
+<para>
+  We  can now read the module containing the ttype definitions from the SQLite3 extension header
+  file that we want.
+<r:code>
+m2 = parseIR("simpleSQL.ll")  # minSQLFib.ll
+</r:code>
+
+We want the type definition of the sqlite3_api global variable.
+This is a pointer to an sqlite3_api_routines struct. So we get
+the global variable, get its type and that pointer's element type:
+<r:code>
 ty = getElementType(getElementType(getType(m2[["sqlite3_api"]])))
-
-fields = .Call("R_StructType_elements", ty)
+api_routines = ty = as(ty, "StructType")#XXX FIX
+</r:code>
+This is StrucType object.
+It has fields
+<r:code>
+fields = getFields(ty)
+</r:code>
+The names of the fields are no longer with the struct as they are not necessary at the IR
+level. We can retrieve these names using <omg:pkg>RCIndex</omg:pkg>.  We'll see how to do this later.
+For now, we can assume that the value_int field is number 107 and the result_int is number 83 in our
+R list.
+Therefore, to get the function pointer details for the int_value field, we can use
+<r:code>
 ff = getElementType(fields[[107]])  # int_value() field.
-params = .Call("R_FunctionType_params", ff)
-rt = .Call("R_FunctionType_getReturnType", ff)
-
-ctxtTy = .Call("R_FunctionType_params", getElementType(fields[[1]]))[[1]]
-
-# Create opaque data struct for sqlite3_value as we never look in its fields.
-# However, this is not necessarily the identical type as the one in the sqlite3_api_routines
-# function pointers. So we get that type used in that module rather than defining our own.
-#sql_val = structType(list(), "sqlite3_value", getContext(m), withNames = FALSE)
+ff = as(ff, "FunctionType") #XXX FIX
+params = getParameters(ff)
+</r:code>
+We  first call getElementType() as the field is a pointer to a function type. We need the function type.
+Then we get the parameters. There is only one. This is a pointer to a sqlite3_value. We will want that type.
+So we store it for subsequent use in defining functions that use this type
+<r:code>
 sql_val = params[[1]]
+</r:code>
+<r:var>sql_val</r:var> is a Type object, as opposed to a Parameter that has/contains a type.
+</para>
+
+<para>
+  We use the sqlite3_value   as an opaque data type. We never look inside its definition
+  to extract values. We receive them and pass them to other routines.
+  So an alternative to extracting the type from our simpleSQL.ll module
+  is to define our own opaque data structure for sqlite3_value
+<r:code eval="false">
+sql_val = structType(list(), "sqlite3_value", getContext(m), withNames = FALSE)
+</r:code>  
+However,
+while this has the same name as the one in simpleSQL.ll, it may not be the identical
+type. Accordingly, the sqlite3_value used in function pointers in the sqlite3_api_routines struct
+will not necessarily match our types. So it is safer to use the sqlite3_value definition from
+simpleSQL.ll for now.
+</para>
+
+<para>
+Note that if we wanted to check the return type of value_int() is an Int32Type, we could get the type with
+<r:code>
+rt = getReturnType(ff)
+</r:code>
+However, we have no need for this.
+</para>
+
+<para>
+  Our wrapper routine accepts a sqlite3_context pointer, an integer, and an sqlite3_value.
+  We need the type for the sqlite3_context.
+  We happen to know that the first field in the sqlite3_api_routines is a pointer to a routine that takes
+  one argument which is an sqlite3_context. So we extract that type for later use with
+<r:code>
+tmp = getElementType(fields[[1]])
+tmp = as(tmp, "FunctionType") #XXX Fix  
+ctxtTy = getParameters(tmp)[[1]]
+</r:code>
+</para>
 
 
-#  structType(list(), "sqlite3_value", getContext(m), withNames = FALSE)
-
+<para>
+We now have the building blocks for our wrapper routine.
+We want to define it with the signature
+<c:code>
+void sqlfib(sqlite3_context *ctxt, int argc, sqlite3_value **argc)  
+</c:code>
+We define our corresponding LLVM function as
+<r:code>
 f = Function("sqlfib", VoidType, list(ctxt = ctxtTy, argc = Int32Type, argv = pointerType(sql_val)), m)
+</r:code>
+<r:var>ctxtTy</r:var> is the type we extract for the sqlite_context * in the parameter from the first field.
+It is a pointer to a sqlite3_context.
+Similarly, sql_val is the type corresponding to a pointer to an sqlite3_value.
+So we need an additional indirection via <r:expr eval="false">pointerType(sql_val)</r:expr>.
+We don't need two calls to pointerType!
+</para>
 
-
-api = createGlobalVariable("sqlite3_api_routines", m, pointerType(ty))
-#api = m[["sqlite3_api_routines"]]
-
+<para>
+  Before we  build the body of our wrapper function, we create our module-specific
+  instance of our sqlite3_api variable, a pointer to an sqlite3_api_routines object.
+  We will be extracting the function pointers we need from this, so we need to create
+  it before we use it.
+  The type for this is given by <r:expr eval="false">pointerType(api_routines)</r:expr>.
+  This is because we peeled away the pointer type when accessing the fields of this struct.
+  So we need to create a pointer to this structure now, with
+<r:code>
+api = createGlobalVariable("sqlite3_api", m, pointerType(api_routines), NULL, linkage = InternalLinkage)
+</r:code>
+<note>The NULL here for the initializer is vital as otherwise LLVM is confused as to whether this is
+a module-local variable or an external variable. This is probably something I should change in Rllvm.</note>
+We give it the name sqlite3_api, but there is no need for us to do this.
+In LLVM, the names are irrelevant as we are dealing with Value objects now.
+</para>
+<para>
+We will build a very simple wrapper function that does no error handling.
+It mirrors the one in minSQL.c.
+We have one BasicBlock
+<r:code>
 b = Block(f)
 ir = IRBuilder(b)
+</r:code>
+We will need access to two of the parameters - ctxt and argv - so we store the parameters in an R variable.
+<r:code>
 nparams = getParameters(f)
+</r:code>
+</para>
 
+<para>
+Now the LLVM fun starts!
+We need to load the value of the sqlite3_api variable in the module so that we can access its
+value_int field. So we load this via
+<r:code>
 api2 = ir$createLoad(api)
-# The 106 comes from the IR or from looking at the struct definition for sqlite3_api_routines
-# and we see that value_int() is in position 107 starting counting at 1.
+</r:code>
+
+Next we access the 106th field. This corresponds to our 107 in R but now we are using 0-based  counting.
+As is typical with GEP (get element pointer) instructions, we need to index by 0 first and then the field.
+<r:code>
 value_int_p = ir$createGEP(api2, c(0L, 106L))
+</r:code>
+Now we have to load that element to be able to use it.
+<r:code>
 value_int = ir$createLoad(value_int_p)
-#argv1 = ir$createGEP(nparams[[3]], c(0L))
+</r:code>
+We now have a reference to the function pointer that we need to invoke to convert the
+first argument to our wrapper to an int value.
+</para>
+<para>
+  So now we need to call that value_int routine.
+  We need only pass it the first element of our third parameter argv.
+  We could <r:func>createGEP</r:func> to access the first element and load it.
+  However, since we are dealing with the first element, we can load it directly by loading argv.
+  So we do this as it is simpler:
+<r:code>
 argv1 = ir$createLoad(nparams[[3]])
+</r:code>
+<!-- #argv1 = ir$createGEP(nparams[[3]], c(0L)) -->
+</para>
 
-arg = ir$createCall(value_int, argv1) #XXXX assertion about matching parameter types is failing and terminating.
-                                       # problem was argv = pointerType(pointerType()). Only one pointerType. Why???
-                                       # Because  the sql_val we extracted from the pregenerated IR gave a
-				       # pointer type to the struct that is sqlite3_value.
+
+<para>
+We can now call value_int() to get the value of the first argument passed to the SQL wrapper.
+<r:code>
+arg = ir$createCall(value_int, argv1)
+</r:code>
+ <!-- 
+This caused issues:  assertion about matching parameter types is failing and terminating.
+ problem was argv = pointerType(pointerType()). Only one pointerType. Why???
+ Because  the sql_val we extracted from the pregenerated IR gave a
+ pointer type to the struct that is sqlite3_value.
+ -->
+ And we can pass this in our call to our fib1() routine which is the routine that we are wrapping.
+ This is a simple call with one argument (<r:var>ans</r:var>) and we have the reference to the
+ function in the module as <r:expr eval="false">m$fib1</r:expr>.
+ So our instruction to call fib1 is 
+<r:code>  
 ans = ir$createCall(m$fib1, arg)
+</r:code>
+and we have our value.
+</para>
 
+<para>
+  Our final step is to marshal the result of the call to fib1() back to SQL.
+  We use return_int for this.
+  This needs both an sqlite3_context pointer and the int value.
+  However, before we call this routine, we have to extract if as function pointer
+  from our sqlite3_api_routines structure.
+  We know that this is result_int field is number 82 when using 0-based counting.
+  So, like we did for the value_int field, we use a createGEP and load instruction to fetch
+  the value of this field in the sqlite3_api pointer object.
+<r:code>
 result_int = ir$createGEP(api2, c(0L, 82L))
 result_int = ir$createLoad(result_int)
-if(FALSE) {
+</r:code>
 
+
+<!--
 a = getElementType(getType(result_int))
 pp = .Call("R_FunctionType_params", a)
 getElementType(pp[[1]])
@@ -58,9 +270,108 @@ sameType(pp[[2]], getType(ans))
 sameType(getType(nparams[[1]]), pp[[1]])
 a = getType(nparams[[1]])
 b = pp[[1]]
-
-
+-->
+</para>
+<para>
+  Now that we have this function pointer, we pass it the context object from our first parameter
+  and the result from calling fib1(), i.e.,
+<r:code>
 ir$createCall(result_int, nparams[[1]], ans)
-
+</r:code>
+</para>
+<para>
+  We are all but finished except we need to explicitly return.
+  Since the wrapper has a return type of void, we create an empty return:
+<r:code>
 ir$createReturn()
+</r:code>
+</para>
+
+<para>
+We can now examine our wrapper routine by looking at the entire module  
+<r:code eval="false">
+showModule(m)
+</r:code>
+The key content is 
+<r:output><![CDATA[
+define void @sqlfib(%struct.sqlite3_context.1* %ctxt, i32 %argc, %struct.sqlite3_value.3** %argv) {
+  %1 = load %struct.sqlite3_api_routines.0*, %struct.sqlite3_api_routines.0** @sqlite3_api
+  %2 = getelementptr %struct.sqlite3_api_routines.0, %struct.sqlite3_api_routines.0* %1, i32 0, i32 106
+  %3 = load i32 (%struct.sqlite3_value.3*)*, i32 (%struct.sqlite3_value.3*)** %2
+  %4 = load %struct.sqlite3_value.3*, %struct.sqlite3_value.3** %argv
+  %5 = call i32 %3(%struct.sqlite3_value.3* %4)
+  %6 = call i32 @fib1(i32 %5)
+  %7 = getelementptr %struct.sqlite3_api_routines.0, %struct.sqlite3_api_routines.0* %1, i32 0, i32 82
+  %8 = load void (%struct.sqlite3_context.1*, i32)*, void (%struct.sqlite3_context.1*, i32)** %7
+  call void %8(%struct.sqlite3_context.1* %ctxt, i32 %6)
+  ret void
 }
+]]></r:output>
+</para>
+
+</section>
+<section eval="false">
+  <title>Setup</title>
+<para>
+We are almost ready to use this wrapper routine that we programmatically generated
+just like we did in the <ulink url="run2.R"/> file.
+However, just as we did there, we need to set the value of our sqlite3_api
+module-level variable.
+We can borrow one from the RSQLiteUDF.so so that is properly initialized.
+<r:code>
+library("RSQLite")
+library("RSQLiteUDF")
+db = dbConnect(SQLite(), "foo")
+sqliteExtension(db, system.file("libs", "RSQLiteUDF.so", package = "RSQLiteUDF"))
+ptr = .Call("R_getSQLite3API", PACKAGE = "RSQLiteUDF")
+</r:code>
+We can explicitly set the pointer from R or we can create an accessor routine
+to set it.
+</para>
+<para>
+Let's consider the accessor. We used that in the run2.R.
+The routine is
+<c:code>
+void
+R_setSQLite3API(void *ptr)
+{
+   sqlite3_api = (sqlite3_api_routines *) ptr;
+}
+</c:code>
+</para>
+<para>
+We can generate this routine in the module with the following LLVM instructions:
+<r:code>
+  f2 = Function("R_setSQLite3API", VoidType, list(pointerType(VoidType)), m)
+  b = Block(f2)
+  ir = IRBuilder(b)
+  val = getParameters(f2)[[1]]
+  ir$createStore( val, ir$createBitCast( api, pointerType(getType(val))))
+  ir$createReturn()
+</r:code>
+Note the need to cast the value.
+</para>
+
+<para>
+Again, as in run2.R, we can call this and set the value of sqlite3_api in our module with
+<r:code eval="false">
+ee = ExecutionEngine(m)
+cif = Rffi::CIF(Rffi::voidType, list(Rffi::pointerType))  
+.llvm(m$R_setSQLite3API, ptr, .ee = ee, .ffi = cif)  
+</r:code>
+</para>
+<para>
+  We have now established the module so that we can use it within an SQL request.
+  We use something very similar to run2.R, only changing the name of our routine to sqlfib,
+  to register the routine with SQL as a UDF.
+<r:code>
+ptr = getPointerToFunction(m$sqlfib, ee)
+createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
+</r:code>
+Now we can use it in a query.
+<r:code>
+d = dbGetQuery(db, "SELECT x, fib(x) FROM mytable")
+d2 = dbGetQuery(db, "SELECT x FROM mytable WHERE fib(x) >= 8")
+</r:code>
+</section>  
+</article>
