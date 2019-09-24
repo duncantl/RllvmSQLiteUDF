@@ -15,7 +15,6 @@ m = parseIR("fib_basic.ll") # may want to clone
 wf = genSQLiteUDFWrapper(m$fib1, module = m)
 
 
-
 library("RSQLite")
 library("RSQLiteUDF")
 db = dbConnect(SQLite(), "foo")
@@ -24,8 +23,8 @@ b = .Call("R_getSQLite3API", PACKAGE = "RSQLiteUDF")
 
 ee = ExecutionEngine(m)
 
-cif = Rffi::CIF(Rffi::voidType, list(Rffi::pointerType))
-.llvm(m$R_setSQLite3API, b, .ee = ee, .ffi = cif)
+llvmAddSymbol("R_ExternalPtrAddr")  # providUndefFunctions(m)
+.llvm(m$R_setSQLite3API, b, .ee = ee)
 
 ptr = getPointerToFunction(m$sqlfib1, ee)
 createSQLFunction(db, ptr@ref, "fib", nargs = 1L)
@@ -232,19 +231,40 @@ if(FALSE) {  #XXX come back to
 }
 
 
-
-genSetAPI =
-function(m, api)    
+genSetAPI2 =
+    #
+    # There are now 2 versions of this - one that passes the pointer and the other than passes the 
+    #  R external pointer object.
+    # The latter is easier call as it does not need a CIF. So we generate that by default. But one can have both.
+function(m, api, name = "setSQLite3API")    
 {
-  f2 = Function("R_setSQLite3API", VoidType, list(pointerType(VoidType)), m)
+  f2 = Function(name, VoidType, list(pointerType(VoidType)), m)
   b = Block(f2)
   ir = IRBuilder(b)
   val = getParameters(f2)[[1]]
   ir$createStore( val, ir$createBitCast( api, pointerType(getType(val))))
+
   ir$createReturn()
 
   f2
 }
+
+genSetAPI =
+function(m, api, name = "R_setSQLite3API")    
+{
+  f2 = Function(name, SEXPType, list(SEXPType), m)
+  b = Block(f2)
+  ir = IRBuilder(b)
+  val = getParameters(f2)[[1]]
+  R_ExternalPtrAddr = Function("R_ExternalPtrAddr", pointerType(VoidType), list(SEXPType), m)
+  ptr = ir$createCall(R_ExternalPtrAddr, val)
+  
+  ir$createStore( ptr, ir$createBitCast( api, pointerType(getType(ptr))))
+  ir$createReturn(val)
+
+  f2
+}
+
 
 sqlite3_api_routines_fieldNames = 
 c("aggregate_context", "aggregate_count", "bind_blob", "bind_double", 
