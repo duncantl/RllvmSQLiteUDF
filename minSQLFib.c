@@ -61,4 +61,13 @@ R_setSQLite3API(void *ptr)
    sqlite3_api = (sqlite3_api_routines*) ptr;
 }
 
+#if 0
+#include <Rdefines.h>
+SEXP
+Rr_setSQLite3API(SEXP rptr)
+{
+    sqlite3_api = (sqlite3_api_routines*) R_ExternalPtrAddr(rptr);
+    return(R_NilValue);
+}
+#endif
 
