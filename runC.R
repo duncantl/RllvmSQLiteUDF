@@ -1,18 +1,18 @@
-require("RSQLite") && require("RSQLiteUDF")
+library("RSQLite")
+library("RSQLiteUDF")
 db = dbConnect(SQLite(), "foo")
 sqliteExtension(db)
 
 
-a = getNativeSymbolInfo("sqlite3_api", "RSQLiteUDF")$address
-
 sqliteExtension(db, system.file("libs", "RSQLiteUDF.so", package = "RSQLiteUDF"))
-sqliteExtension(db, "fib.so")
+a = getNativeSymbolInfo("sqlite3_api", "RSQLiteUDF")$address
+#sqliteExtension(db, "fib.so")
 
-dyn.load("fib.so")
-.Call("R_setSQLite3API", a)
+dll = dyn.load("fib.so")
+.Call(dll$R_setSQLite3API, a)
 
 p = getNativeSymbolInfo("sqlTen")
-createSQLFunction(db, "sqlTen", "ten", nargs = 0L)
+createSQLFunction(db, p, "ten", nargs = 0L)
 
 d = dbGetQuery(db, "SELECT ten()")
 
