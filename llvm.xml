@@ -84,8 +84,7 @@ We want the type definition of the sqlite3_api global variable.
 This is a pointer to an sqlite3_api_routines struct. So we get
 the global variable, get its type and that pointer's element type:
 <r:code>
-ty = getElementType(getElementType(getType(m2[["sqlite3_api"]])))
-api_routines = ty = as(ty, "StructType")#XXX FIX
+api_routines  = ty = getElementType(getElementType(getType(m2[["sqlite3_api"]])))
 </r:code>
 This is StrucType object.
 It has fields
@@ -99,7 +98,6 @@ R list.
 Therefore, to get the function pointer details for the int_value field, we can use
 <r:code>
 ff = getElementType(fields[[107]])  # int_value() field.
-ff = as(ff, "FunctionType") #XXX FIX
 params = getParameters(ff)
 </r:code>
 We  first call getElementType() as the field is a pointer to a function type. We need the function type.
@@ -507,10 +505,20 @@ sapply(p, getName)
 <para>
   In principle, we could read the header file and programmatically
   construct the sqlite3_api_routines data structure for LLVM by
-  translating it from RCIndex types to LLVM types.
+  translating it and its fields from RCIndex types to LLVM types.
   This would allow us to avoid relying on the template simpleSQL.ll file.
   However, this does not seem like a better approach.
-  <!-- explain why FIX -->
+  It is a lot of work, with little gain.
+What we do gain is that we work from the C code, rather than the IR code.
+This retains the names of the fields and parameters in the function pointers.
+This is useful.
+It also allows us to look at code that has not been compiled away.
+However, this is also an issue. If we do not pass the appropriate or same flags to 
+our parser as will be used when compiling the C code, the different preprocessor 
+options may lead us to work with code that won't be in the compiled code.
+So we haven't resolved the issue of matching the compilation flags and 
+what elements are removed and kept.
+  <!-- FIX -->
 </para>
 
 
