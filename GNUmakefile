@@ -6,7 +6,7 @@ R_INC=${R_HOME}/include
 #R_INC=/usr/share/R/include
 
 %.ll: %.c GNUmakefile
-	$(CLANG) -O3 -S -emit-llvm fib.c -I${R_INC} -I/usr/local/include
+	$(CLANG) -O3 -S -emit-llvm $< -I${R_INC} -I/usr/local/include
 
 # Or use -I${HOME}/local/include
 
@@ -17,6 +17,6 @@ fib.so: fib.c
 simpleSQL.ll: simpleSQL.c GNUmakefile
 	$(CLANG) -O0 -S -emit-llvm $< -I${HOME}/local/include
 
-%.ll: %.c GNUmakefile
-	$(CLANG) -O3 -S -emit-llvm $< -I${HOME}/local/include
+#%.ll: %.c GNUmakefile
+#	$(CLANG) -O3 -S -emit-llvm $< -I${HOME}/local/include
 
